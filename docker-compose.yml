@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+
+  web:
+    build: .
+    image: web-payment-api
+    container_name: web-payment-api
+    ports:
+      - "5000:5000"
+    command: python manage.py run -h 0.0.0.0
+    volumes:
+      - .:/usr/src/app
+    env_file:
+      - ./.env
+    depends_on:
+      - mongo
+      - redis
+
+  worker:
+    build: .
+    container_name: worker-payment-api
+    command: celery --app app.tasks worker --loglevel=info --logfile=app/logs/celery.log
+    volumes:
+      - .:/usr/src/app
+    env_file:
+      - ./.env
+    depends_on:
+      - web
+      - redis
+
+  dashboard:
+    build: .
+    container_name: dashboard-worker-payment-api
+    command: celery --app app.tasks flower --port=5555 --broker=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    env_file:
+      - ./.env
+    depends_on:
+      - web
+      - redis
+      - worker
+
+  mongo:
+    image: mongo:4.4
+    environment:
+      - MONGO_INITDB_DATABASE=payment_db
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:6-alpine
+
+volumes:
+  mongo_data:
